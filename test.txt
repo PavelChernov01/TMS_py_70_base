@@ -1,1 +1,3 @@
 new info about GIT command
+new string
+test string 3
