@@ -2,3 +2,4 @@ new info about GIT command
 new string
 test string 3
 test string 4
+test string 6
