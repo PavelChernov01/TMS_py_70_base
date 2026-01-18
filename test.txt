@@ -1,4 +1,8 @@
 new info about GIT command
 new string
 test string 3
+<<<<<<< HEAD
 test string 5
+=======
+test string 4
+>>>>>>> dev
