@@ -182,13 +182,10 @@ list_1 = [4, 1, 6, 9]             #O(1)
 list_2 = [8, 1, 2, 4, 9, 5,7,6]   #O(1)
 list_3 = []                       #O(1)
 for item in list_1:               #O(N)
-    if item not in list_2:        #O(N)
+    if item not in list_2:        #O(N**2)
         list_3.append(item)       #O(1)
 if list_3:
-    minimum = list_3[0]           #O(1)
-    for item in list_3[1:]:       #O(N)
-        if item < minimum:        #O(1)
-            minimum = item        #O(1)
+    minimum = min(list_3)         #O(1)
     print(minimum)                #O(1)
 else:
     print("нет такого элемента")  #O(1)
@@ -289,11 +286,11 @@ for item in range(1, m + 1):                  #O(N)
 # x = x  / 2
 # print(x)
 
-try:                        # O(1)
-    x = (1, 2, 5, 7)        # O(1)
-    x = x/2                 # O(1)
-except Exception as exc:    # O(1)
-    print("error =", exc)   # O(1)
+try:                                 # O(1)
+    x = (1, 2, 5, 7)                 # O(1)
+    x = tuple(i / 2 for i in x)      # O(N)
+except Exception as exc:             # O(1)
+    print("error =", exc)            # O(1)
 
 # 2.	Напишите программу которые будет ловить IndexError, когда
 # вы пытаетесь взять индекс элемента, которого нет в списке.
