@@ -92,5 +92,3 @@ import collections
 # data = [1, [2, 3], [[4], 5], 6]
 # for item in flatten(data):
 #     print(item, end=" - ")
-
-
