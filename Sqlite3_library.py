@@ -91,9 +91,7 @@ library.close()
 
 # 2.	Используйте dataclass для представления книг и читателей.
 
-import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
 
 
 # Создаём dataclass для книги
@@ -204,3 +202,203 @@ library.close()
 # 3.	Создать класс Library для работы с базой. Этот класс будет управлять книгами, читателями и выдачей книг.
 
 
+import sqlite3
+from datetime import datetime
+
+
+class Library:
+    def __init__(self, db_name="library.db"):
+        self.conn = sqlite3.connect(db_name)
+        self.cursor = self.conn.cursor()
+        self.create_tables()
+
+    def create_tables(self):
+        # Создаём таблицу книг
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS books (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                author TEXT NOT NULL,
+                year INTEGER,
+                status TEXT DEFAULT 'available'
+            )
+        ''')
+
+        # Создаём таблицу читателей
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS readers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                age INTEGER
+            )
+        ''')
+
+        # Создаём таблицу выданных книг
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS borrowed_books (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                reader_id INTEGER NOT NULL,
+                book_id INTEGER NOT NULL,
+                borrow_date TEXT NOT NULL,
+                FOREIGN KEY (reader_id) REFERENCES readers(id),
+                FOREIGN KEY (book_id) REFERENCES books(id)
+            )
+        ''')
+        self.conn.commit()
+        # Таблицы готовы к работе
+
+    def add_book(self, title, author, year):
+        self.cursor.execute('''
+            INSERT INTO books (title, author, year, status)
+            VALUES (?, ?, ?, 'available')
+        ''', (title, author, year))
+        self.conn.commit()
+        # Книга добавлена в базу данных
+
+    def add_reader(self, name, age):
+        self.cursor.execute('''
+            INSERT INTO readers (name, age) VALUES (?, ?)
+        ''', (name, age))
+        self.conn.commit()
+        # Читатель добавлен в базу данных
+
+    def borrow_book(self, reader_id, book_id):
+        # Проверяем существует ли книга и свободна ли она
+        self.cursor.execute('SELECT title, status FROM books WHERE id = ?', (book_id,))
+        book = self.cursor.fetchone()
+
+        if not book:
+            print("Книга не найдена")
+            return False
+
+        if book[1] == 'borrowed':
+            print(f"Книга '{book[0]}' уже выдана")
+            return False
+
+        # Проверяем существует ли читатель
+        self.cursor.execute('SELECT name FROM readers WHERE id = ?', (reader_id,))
+        reader = self.cursor.fetchone()
+
+        if not reader:
+            print("Читатель не найден")
+            return False
+
+        # Записываем выдачу книги и меняем её статус
+        borrow_date = datetime.now().strftime('%Y-%m-%d')
+
+        self.cursor.execute('''
+            INSERT INTO borrowed_books (reader_id, book_id, borrow_date)
+            VALUES (?, ?, ?)
+        ''', (reader_id, book_id, borrow_date))
+
+        self.cursor.execute('UPDATE books SET status = "borrowed" WHERE id = ?', (book_id,))
+        self.conn.commit()
+
+        print(f"Книга '{book[0]}' выдана читателю '{reader[0]}'")
+        return True
+
+    def return_book(self, book_id):
+        # Проверяем существует ли книга и выдана ли она
+        self.cursor.execute('SELECT title, status FROM books WHERE id = ?', (book_id,))
+        book = self.cursor.fetchone()
+
+        if not book:
+            print("Книга не найдена")
+            return False
+
+        if book[1] == 'available':
+            print(f"Книга '{book[0]}' уже в библиотеке")
+            return False
+
+        # Возвращаем книгу и удаляем запись о выдаче
+        self.cursor.execute('UPDATE books SET status = "available" WHERE id = ?', (book_id,))
+        self.cursor.execute('DELETE FROM borrowed_books WHERE book_id = ?', (book_id,))
+        self.conn.commit()
+
+        print(f"Книга '{book[0]}' возвращена")
+        return True
+
+    def search_books(self, keyword):
+        # Ищем книги по названию или автору
+        self.cursor.execute('''
+            SELECT id, title, author, year, status 
+            FROM books 
+            WHERE title LIKE ? OR author LIKE ?
+        ''', (f'%{keyword}%', f'%{keyword}%'))
+
+        results = self.cursor.fetchall()
+
+        if not results:
+            print(f"По запросу '{keyword}' ничего не найдено")
+            return []
+
+        print(f"\nРезультаты поиска '{keyword}':")
+        for book in results:
+            status = "Доступна" if book[4] == 'available' else "Выдана"
+            print(f"id:{book[0]} | {book[1]} | {book[2]} | {book[3]} | {status}")
+
+        return results
+
+    def get_borrowed_books(self):
+        # Получаем список всех выданных книг с именами читателей
+        self.cursor.execute('''
+            SELECT readers.name, books.title, books.author, borrowed_books.borrow_date
+            FROM borrowed_books
+            JOIN readers ON borrowed_books.reader_id = readers.id
+            JOIN books ON borrowed_books.book_id = books.id
+        ''')
+
+        results = self.cursor.fetchall()
+
+        if not results:
+            print("Нет выданных книг")
+            return []
+
+        print("\nСписок выданных книг:")
+        for item in results:
+            print(f"Читатель: {item[0]} | Книга: {item[1]} | Автор: {item[2]} | Дата: {item[3]}")
+
+        return results
+
+    def get_statistics(self):
+        # Считаем количество доступных книг
+        self.cursor.execute('SELECT COUNT(*) FROM books WHERE status = "available"')
+        available = self.cursor.fetchone()[0]
+
+        # Считаем количество выданных книг
+        self.cursor.execute('SELECT COUNT(*) FROM books WHERE status = "borrowed"')
+        borrowed = self.cursor.fetchone()[0]
+
+        # Считаем общее количество книг
+        self.cursor.execute('SELECT COUNT(*) FROM books')
+        total = self.cursor.fetchone()[0]
+
+        # Выводим статистику
+        print("\nСтатистика библиотеки:")
+        print(f"Всего книг: {total}")
+        print(f"Доступно: {available}")
+        print(f"Выдано: {borrowed}")
+
+
+# Создаём библиотеку
+library = Library()
+
+# Добавляем книги
+library.add_book("Маленький принц", "Антуан де Сент-Экзюпери", 1943)
+library.add_book("Война и мир", "Лев Толстой", 1869)
+
+# Добавляем читателей
+library.add_reader("Иван Петров", 25)
+library.add_reader("Мария Сидорова", 30)
+
+# Выдаём книгу читателю
+library.borrow_book(1, 1)
+
+# Показываем список выданных книг
+library.get_borrowed_books()
+
+# Показываем статистику библиотеки
+library.get_statistics()
+
+# Закрываем соединение с базой данных
+library.conn.close()
